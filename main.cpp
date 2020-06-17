@@ -4,7 +4,6 @@ using namespace std;
 #include "tokenizer.h"
 #include <fstream>
 
-
 std::string TT2[] = {"EOL","CREATE", "TABLE", "COMMA", "STAR", "EQ", "LPAREN", "RPAREN", "PRIMARY KEY", "NOT NULL",
     "AUTO_INCREMENT", "SEMICOLON", "STRING_CONS", "TRUNCATE", "DROP", "WHERE", "DELETE", "FROM", "INSERT", "INTO", "VALUES",
      "SELECT", "TEXT_STR", "ERROR", "INT", "FLOAT", "CHAR", "TEXT", "DATE", "TIME", "AND", "UPDATE", "SET", "NOTEQ",
@@ -409,7 +408,7 @@ int ParseInsertStmt(Tokenizer &tzr) {
             std::cout<<"Cannot INSERT value to AUTO_INCREMENT column : "<<colname.name<<"\n";
             return 2;
         }
-        if(c.type == TEXT && values[i].type != TEXT_STR) {
+        if((c.type == TEXT || c.type == CHAR)&& values[i].type != TEXT_STR) {
             std::cout<<"Data of type TEXT should be enclosed by \"\"\n ";
             return 2;
         }
@@ -687,13 +686,14 @@ int parseWhere(Tokenizer &tzr, std::string table_name, std::vector<int> &result)
             std::sort(res.begin(), res.end());
             std::sort(res2.begin(), res2.end());
             std::set_intersection(res.begin(), res.end(), res2.begin(), res2.end(), back_inserter(result));
+            break;
         default:
-            return false;
+            return 0;
             break;
     }
     Token t = peek(tzr);
     if(t.type == SEMICOLON || t.type == ORDER)
-        return true;
+        return 1;
     else if(t.type == AND) {
         tzr.GetToken();
         std::vector<int> result2;
@@ -704,9 +704,9 @@ int parseWhere(Tokenizer &tzr, std::string table_name, std::vector<int> &result)
         result.clear();
         std::sort(result1_temp.begin(), result1_temp.end());
         std::set_intersection(result1_temp.begin(), result1_temp.end(), result2.begin(), result2.end(), back_inserter(result));
-        return true;
+        return 1;
     }
-    else return false;
+    else return 0;
 
 
     return false;
@@ -747,7 +747,7 @@ int ParseDeleteStmt(Tokenizer &tzr) {
     return 1;
 
 }
-bool ParseUpdateStmt(Tokenizer &tzr) {
+int ParseUpdateStmt(Tokenizer &tzr) {
     std::vector<std::vector<Token>> set_list;
     if((tzr.expect(UPDATE)).type == ERROR) return 0;
     Token table = tzr.expect(STRING_CONS);
@@ -786,11 +786,9 @@ bool ParseUpdateStmt(Tokenizer &tzr) {
         std::cout<<"Table doesn't exist\n";
         return 2;
     }
-    std::cout<<"REACHED 2\n";
     if(peek(tzr).type == WHERE) {
         tzr.GetToken();
         int r = parseWhere(tzr, table_name, result);
-        std::cout<<"Result of where : "<<r<<"\n";
         if(r != 1) return r;
         if((tzr.expect(SEMICOLON)).type == ERROR) return 0;
     } else if(peek(tzr).type == SEMICOLON) {
@@ -798,7 +796,6 @@ bool ParseUpdateStmt(Tokenizer &tzr) {
             result.push_back(i);
     }
     std::sort(result.begin(), result.end());
-    std::cout<<"REACHED\n";
     for(unsigned int j=0;j<set_list.size();j++) {
         Column c = ct->get_Column((set_list[j])[0].name);
         if(c.isAutoIncrement && c.isNotNull) {
@@ -867,14 +864,14 @@ bool ParseUpdateStmt(Tokenizer &tzr) {
 
 }
 
-bool ParseOrder(Tokenizer &tzr, std::vector<int> &result, std::string table_name) {
+int ParseOrder(Tokenizer &tzr, std::vector<int> &result, std::string table_name) {
     tzr.GetToken();
-    if((tzr.expect(BY)).type == ERROR) return false;
+    if((tzr.expect(BY)).type == ERROR) return 0;
     Token order_by = tzr.expect(STRING_CONS);
-    if(order_by.type == ERROR) return false;
+    if(order_by.type == ERROR) return 0;
     std::string order = order_by.name;
     Token dir = tzr.GetToken();
-    if(dir.type != ASC && dir.type != DESC) return false;
+    if(dir.type != ASC && dir.type != DESC) return 0;
     std::vector<Row> *rows;
     for(Table &t : tables) {
         if(t.get_Name() == table_name) {
@@ -885,7 +882,11 @@ bool ParseOrder(Tokenizer &tzr, std::vector<int> &result, std::string table_name
     for(unsigned int i=0;i<(*rows)[0].rowNodes.size();i++) {
         if((*rows)[0].rowNodes[i].colname == order) colnum = (int)i;
     }
-    if(colnum == -1) return false;
+
+    if(colnum == -1) {
+        std::cout<<"Column"<<order<<" not found\n";
+        return 2;
+    }
     std::vector<int> tmp_result = result;
     result.clear();
     unsigned int s = tmp_result.size();
@@ -909,7 +910,7 @@ bool ParseOrder(Tokenizer &tzr, std::vector<int> &result, std::string table_name
                     if(std::stof(n.data) > std::stof(n2.data)) low = j;
                     break;
                 default:
-                    return false;
+                    return 0;
             }
         }
         result.push_back(tmp_result[low]);
@@ -917,7 +918,7 @@ bool ParseOrder(Tokenizer &tzr, std::vector<int> &result, std::string table_name
 
     }
     if(dir.type == DESC) std::reverse(result.begin(), result.end());
-    return true;
+    return 1;
 }
 
 int ParseSelectStmt(Tokenizer &tzr) {
@@ -1247,6 +1248,7 @@ void TryParse(std::string cmd) {
             result = ParseDeleteStmt(tzr);
         } else if(t.type == UPDATE) {
             result = ParseUpdateStmt(tzr);
+            std::cout<<result<<"\n";
         } else if(t.type == SELECT) {
             result = ParseSelectStmt(tzr);
             if(result == 1) return;
