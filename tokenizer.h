@@ -3,7 +3,11 @@
 #include <vector>
 #include <math.h>
 #include <iostream>
-#include <bits/stdc++.h>
+//#include <bits/stdc++.h>
+#include <iomanip>
+#include <iterator>
+#include <algorithm>
+#include <string.h>
 typedef enum {
 	EOL = 0, CREATE, TABLE, COMMA, STAR, EQ, LPAREN, RPAREN, PRIMARY_KEY, NOT_NULL, AUTO_INCREMENT, SEMICOLON, STRING_CONS,
 	TRUNCATE, DROP, WHERE, DELETE, FROM, INSERT, INTO, VALUES, SELECT, TEXT_STR, ERROR, INT, FLOAT, CHAR, TEXT, DATE,
